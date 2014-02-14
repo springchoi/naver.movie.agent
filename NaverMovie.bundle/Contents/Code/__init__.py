@@ -1,15 +1,11 @@
 # -*- coding: utf-8 -*-
+
 import re
 import datetime
+import urllib2
 
-import httplib
-from urlparse import urlparse
-
-NAVER_APIKEY     = "YOUR_API_KEY"
-NAVER_API_URL    = "http://openapi.naver.com/search"
-
+NAVER_SEARCH_URL = "http://movie.naver.com/movie/search/result.nhn"
 NAVER_CONTENT_URL = "http://movie.naver.com/movie/bi/mi/basic.nhn"
-#NAVER_PHOTO_URL = "http://movie.naver.com/movie/bi/mi/photoView.nhn"
 
 def Start():
 	HTTP.CacheTime = CACHE_1MINUTE
@@ -23,72 +19,36 @@ class NaverMovieAgent(Agent.Movies):
 	accepts_from = ['com.plexapp.agents.localmedia']
 	#contributes_to = None
 
-	def getUid(self, url):
-		urlInfo = urlparse(url)
-		conn = httplib.HTTPConnection(urlInfo.netloc)
-		conn.request("HEAD", "%s?%s" % (urlInfo.path, urlInfo.query))
-		resp = conn.getresponse()
-		Log(resp.status)
-		if resp.status == 302:
-			urlMovie = resp.getheader('location')
-			try:
-				Log(urlMovie)
-				uid = re.search("\?code=(\d+)", urlMovie).group(1)
-				return uid
-			except Exception, e:
-				pass
-
-		Log("Cannot find movie info")
-		return None
-
 	def search(self, results, media, lang, manual):
-		Log(media.name)
-		Log(media.year)
+		Log("%s (%s)", (media.name, media.year))
 
-		queryStart = 1
-		requestParams = {'target':'movie', 'query':media.name, 'start':queryStart, 'display':100, 'key':NAVER_APIKEY}
-		xml = XML.ElementFromURL(NAVER_API_URL, requestParams, encoding='utf-8')
-		#Log(xml.tag)
+		url = "http://movie.naver.com/movie/search/result.nhn?section=movie&ie=utf8&query=%s" % urllib2.quote(media.name)
 		try:
-			total = int(xml.xpath('/rss/channel/total')[0].text)
-			display = int(xml.xpath('/rss/channel/display')[0].text)
-			Log("Total: %s, Display: %s" % (total, display))
-		except Exception,e:
+			html = HTML.ElementFromURL(url, encoding='euc-kr')
+		except Exception, e:
 			Log(e)
+			return
 
-		#Log(result['entries'])
-		#Log(dir(results))
-		for entry in xml.xpath('//item'):
-			title = entry.xpath('title')[0].text.replace('<b>','').replace('</b>','')
-			
-			year = entry.xpath('pubDate')[0].text
-			
-			if year:
-				year = int(year)
-			
-				if media.year:
-					if abs(int(media.year) - year) > 2:
-						Log("Skip this %s coz year" % title)
-						continue
+		content = html.xpath('//div[@id="old_content"]')[0]
+
+		for entry in html.xpath('//ul[@class="search_list_1"]/li'):
+			node = entry.xpath('.//dt/a')[0]
+			title = node.text_content()
+			url = node.get('href')
+			cotentId = re.search('code=(\d+)', url).group(0).strip('code=')
+			etc = entry.xpath('.//dd[@class="etc"]')[0].text_content().rpartition('|')
+			year = int(etc[-1].strip())
+			if media.year:
+				if abs(int(media.year) - year) > 2:
+					Log("Skip this %s coz year" % title)
+					continue
 			elif media.year:
 				year = media.year
 
-			Log(title)
+			uid = "%s_%s" % (cotentId, year)
 			#score = int(float(entry.xpath('userRating')[0].text) * 10)
 			# TODO : use string matching score
 			score = 85
-			node = entry.xpath('image')
-			'''
-			if node[0].text and re.match('\d+', node[0].text):
-				uid = node[0].text.rpartition('/')[-1].partition('_')[0]
-			else:
-				uid = entry.xpath('link')[0].text
-			'''
-			url = entry.xpath('link')[0].text
-			uid = "%s_%s" % (self.getUid(url), year if year else '')
-			#html = HTML.ElementFromURL(url, encoding='utf-8')
-			#urlMovie = html.xpath("/html/head/meta[@property='og:url']")[0].get('content')
-			#uid = re.search('code=(\d+)', urlMovie).group(1)
 			Log("%s %s %s %s" % (year, title, score, uid))
 			results.Append(MetadataSearchResult(id=uid, name=title, year=year, score=score, lang=lang))
 
@@ -98,11 +58,9 @@ class NaverMovieAgent(Agent.Movies):
 		#Log(url)
 		
 		(uid, year) = metadata.id.split('_')
-
-		if re.match('\d+', metadata.id):
-			html = HTML.ElementFromURL(NAVER_CONTENT_URL, {'code':uid}, encoding='utf-8')
-		else:
-			html = HTML.ElementFromURL(metadata.id, encoding='utf-8')
+		uid = metadata.id
+	
+		html = HTML.ElementFromURL(NAVER_CONTENT_URL, {'code':uid}, encoding='utf-8')
 
 		metadata.title = html.xpath("//h3[@class='h_movie']/a")[0].text
 		Log("Title : %s (%s)" % (metadata.title, metadata.id))
