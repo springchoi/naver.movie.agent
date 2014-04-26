@@ -20,7 +20,7 @@ class NaverMovieAgent(Agent.Movies):
 	#contributes_to = None
 
 	def search(self, results, media, lang, manual):
-		Log("%s (%s)", (media.name, media.year))
+		Log("%s (%s)" % (media.name, media.year))
 
 		url = "http://movie.naver.com/movie/search/result.nhn?section=movie&ie=utf8&query=%s" % urllib2.quote(media.name)
 		try:
@@ -53,13 +53,10 @@ class NaverMovieAgent(Agent.Movies):
 			results.Append(MetadataSearchResult(id=uid, name=title, year=year, score=score, lang=lang))
 
 	def update(self, metadata, media, lang, force):
-		
-		#url = NAVER_CONTENT_URL + metadata.id
-		#Log(url)
-		
 		(uid, year) = metadata.id.split('_')
-		uid = metadata.id
-	
+		url = "%s?code=%s" % (NAVER_CONTENT_URL, metadata.id)
+		Log(url)
+
 		html = HTML.ElementFromURL(NAVER_CONTENT_URL, {'code':uid}, encoding='utf-8')
 
 		metadata.title = html.xpath("//h3[@class='h_movie']/a")[0].text
