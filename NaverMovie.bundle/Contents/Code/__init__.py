@@ -37,7 +37,10 @@ class NaverMovieAgent(Agent.Movies):
 			url = node.get('href')
 			cotentId = re.search('code=(\d+)', url).group(0).strip('code=')
 			etc = entry.xpath('.//dd[@class="etc"]')[0].text_content().rpartition('|')
-			year = int(etc[-1].strip())
+			try:
+				year = int(etc[-1].strip())
+			except:
+				year = None
 			if media.year and str(media.year).isdigit():
 				if abs(int(media.year) - year) > 2:
 					Log("Skip this %s coz year" % title)
