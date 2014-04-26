@@ -24,7 +24,7 @@ class NaverMovieAgent(Agent.Movies):
 
 		url = "http://movie.naver.com/movie/search/result.nhn?section=movie&ie=utf8&query=%s" % urllib2.quote(media.name)
 		try:
-			html = HTML.ElementFromURL(url, encoding='euc-kr')
+			html = HTML.ElementFromURL(url, encoding='MS949')
 		except Exception, e:
 			Log(e)
 			return
@@ -38,12 +38,12 @@ class NaverMovieAgent(Agent.Movies):
 			cotentId = re.search('code=(\d+)', url).group(0).strip('code=')
 			etc = entry.xpath('.//dd[@class="etc"]')[0].text_content().rpartition('|')
 			year = int(etc[-1].strip())
-			if media.year:
+			if media.year and str(media.year).isdigit():
 				if abs(int(media.year) - year) > 2:
 					Log("Skip this %s coz year" % title)
 					continue
-			elif media.year:
-				year = media.year
+				else:
+					year = int(media.year)
 
 			uid = "%s_%s" % (cotentId, year)
 			#score = int(float(entry.xpath('userRating')[0].text) * 10)
